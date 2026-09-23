@@ -146,3 +146,29 @@ def test_main_exits_with_instructions_when_offline(monkeypatch, tmp_path, capsys
         mb.main()
     assert e.value.code == 2
     assert "--data" in capsys.readouterr().err
+
+
+def test_falls_back_to_opencv_copy(monkeypatch, tmp_path):
+    import cv2
+
+    img = (multiscale_texture(40, 60) * 255).astype("uint8")
+    ok, png = cv2.imencode(".png", img)
+    mb.write_flo(tmp_path / "gt.flo", np.zeros((40, 60, 2), np.float32))
+    flo_bytes = (tmp_path / "gt.flo").read_bytes()
+
+    def fake_urlopen(req, timeout):
+        if "middlebury" in req.full_url:
+            raise TimeoutError("timed out")
+        return _Resp(flo_bytes if req.full_url.endswith(".flo") else png.tobytes())
+
+    monkeypatch.setattr(mb.urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(mb.time, "sleep", lambda s: None)
+    data = tmp_path / "data"
+    assert mb.download(data) == "opencv"
+    assert (data / "opencv" / "RubberWhale" / "flow10.flo").exists()
+    assert (data / "opencv" / "Street-720p" / "frame10i11.png").exists()
+    assert "OpenCV" in mb.data_note(data)
+    rows = mb.evaluate_flow(data, "numpy", mb.FlowParams())
+    assert {r.seq for r in rows} == {"RubberWhale"}
+    interp = mb.evaluate_interp(data, "numpy", mb.FlowParams())
+    assert {r.seq for r in interp} == {"Corridor-VGA", "Street-720p"}

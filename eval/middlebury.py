@@ -11,10 +11,18 @@ Two questions, answered on the public training sequences:
     python eval/middlebury.py --download          # a few MB into eval/data
     python eval/middlebury.py --backend cuda --out eval/results.md
 
-If the download is blocked (some networks cannot reach vision.middlebury.edu),
-download other-color-twoframes.zip, other-gt-flow.zip and other-gt-interp.zip
-from https://vision.middlebury.edu/flow/data/ in a browser, unzip them anywhere
-under one folder, and pass it with --data.
+Data sources (``--source``, default ``auto`` tries them in this order):
+
+* ``middlebury``: the official archives from vision.middlebury.edu (8 sequences
+  with ground-truth flow, 8 with ground-truth interpolated frames). The site is
+  often unreachable from cloud machines such as Colab.
+* ``opencv``: the copy OpenCV keeps in its test data on GitHub. It has one
+  Middlebury sequence with ground-truth flow (RubberWhale). For interpolation it
+  uses three consecutive frames of two real videos from the same folder: frames
+  0 and 2 go in, and the held-out frame 1 is the ground truth ("leave one out").
+
+You can also download the Middlebury zips in a browser, unzip them into one
+folder and pass it with --data.
 
 Natural video is not what Flipster is tuned for (it expects line art), so this
 is a sanity check of the core algorithm against well-known references, not a
@@ -49,6 +57,25 @@ MIRRORS = (
     "https://vision.middlebury.edu/flow/data/comp/zip/",
     "http://vision.middlebury.edu/flow/data/comp/zip/",
 )
+OPENCV_BASE = "https://raw.githubusercontent.com/opencv/opencv_extra/4.x/testdata/cv/optflow/"
+# sequence -> {Middlebury-style name: file in opencv_extra}
+OPENCV_FILES = {
+    "RubberWhale": {
+        "frame10.png": "RubberWhale1.png",
+        "frame11.png": "RubberWhale2.png",
+        "flow10.flo": "RubberWhale.flo",
+    },
+    "Corridor-VGA": {
+        "frame10.png": "frames/VGA_00.png",
+        "frame10i11.png": "frames/VGA_01.png",
+        "frame11.png": "frames/VGA_02.png",
+    },
+    "Street-720p": {
+        "frame10.png": "frames/720p_00.png",
+        "frame10i11.png": "frames/720p_01.png",
+        "frame11.png": "frames/720p_02.png",
+    },
+}
 # name -> required? (the interpolation ground truth is only needed for part 2)
 ARCHIVES = {"other-color-twoframes.zip": True, "other-gt-flow.zip": True, "other-gt-interp.zip": False}
 TAG_FLOAT = 202021.25
@@ -62,11 +89,11 @@ class DownloadError(RuntimeError):
     pass
 
 
-def fetch(name: str, attempts: int = 3, timeout: float = 30.0) -> bytes:
-    """Download one archive, trying https then http, with retries and backoff."""
+def fetch(name: str, attempts: int = 3, timeout: float = 30.0, bases: tuple[str, ...] = MIRRORS) -> bytes:
+    """Download one file, trying each base URL in turn, with retries and backoff."""
     last: Exception | None = None
     for attempt in range(attempts):
-        for base in MIRRORS:
+        for base in bases:
             req = urllib.request.Request(base + name, headers={"User-Agent": "Mozilla/5.0 (flipster-eval)"})
             try:
                 with urllib.request.urlopen(req, timeout=timeout) as r:
@@ -83,20 +110,56 @@ def fetch(name: str, attempts: int = 3, timeout: float = 30.0) -> bytes:
     raise DownloadError(f"could not download {name}: {last}")
 
 
-def download(dest: Path) -> None:
+def download_middlebury(dest: Path, attempts: int = 3) -> None:
     dest.mkdir(parents=True, exist_ok=True)
     for name, required in ARCHIVES.items():
         marker = dest / f".{name}.done"
         if marker.exists():
             continue
-        print(f"downloading {name} ...", flush=True)
+        print(f"downloading {name} from vision.middlebury.edu ...", flush=True)
         try:
-            zipfile.ZipFile(io.BytesIO(fetch(name))).extractall(dest)
+            zipfile.ZipFile(io.BytesIO(fetch(name, attempts=attempts))).extractall(dest)
             marker.touch()
         except DownloadError as e:
             if required:
                 raise
             print(f"  skipping optional {name}: {e}", flush=True)
+
+
+def download_opencv(dest: Path) -> None:
+    """Fetch the OpenCV-hosted subset and lay it out like the Middlebury archives."""
+    for seq, files in OPENCV_FILES.items():
+        d = dest / "opencv" / seq
+        d.mkdir(parents=True, exist_ok=True)
+        for local, remote in files.items():
+            if not (d / local).exists():
+                print(f"downloading opencv_extra/{remote} ...", flush=True)
+                (d / local).write_bytes(fetch(remote, bases=(OPENCV_BASE,)))
+
+
+def download(dest: Path, source: str = "auto") -> str:
+    """Download evaluation data; returns the source actually used."""
+    if source in ("auto", "middlebury"):
+        try:
+            download_middlebury(dest, attempts=3 if source == "middlebury" else 1)
+            return "middlebury"
+        except DownloadError as e:
+            if source == "middlebury":
+                raise
+            print(f"\nvision.middlebury.edu is unreachable ({e}); using the copy in OpenCV's test data instead.\n")
+    download_opencv(dest)
+    return "opencv"
+
+
+def data_note(root: Path) -> str:
+    official = sorted({p.parent.name for p in root.glob("**/flow10.flo") if "opencv" not in p.parts})
+    if official:
+        return f"Data: official Middlebury archives ({len(official)} sequences with ground-truth flow)."
+    return (
+        "Data: the Middlebury RubberWhale sequence from OpenCV's test data (ground-truth flow), and for "
+        "interpolation two real video clips from the same folder, evaluated leave-one-out (frames 0 and 2 in, "
+        "frame 1 held out as ground truth)."
+    )
 
 
 def find(root: Path, seq: str, filename: str) -> Path | None:
@@ -251,15 +314,16 @@ def _table(rows, key_a: str, key_b: str, fmt: str, label_a: str, label_b: str) -
     return out
 
 
-def report(flow_rows: list[FlowRow], interp_rows: list[InterpRow]) -> str:
-    lines = ["### Flow accuracy (frame10 → frame11)", "", "Average end-point error in pixels (lower is better).", ""]
+def report(flow_rows: list[FlowRow], interp_rows: list[InterpRow], note: str = "") -> str:
+    lines = [note, ""] if note else []
+    lines += ["### Flow accuracy (frame10 → frame11)", "", "Average end-point error in pixels (lower is better).", ""]
     lines += _table(flow_rows, "aee", "aae", ".3f", "AEE", "AAE°")
     lines += ["", "### Midpoint interpolation (frame10i11)", ""]
     if interp_rows:
         lines += ["PSNR in dB (higher is better).", ""]
         lines += _table(interp_rows, "psnr", "ssim", ".2f", "PSNR", "SSIM")
     else:
-        lines += ["Skipped: no ground-truth interpolated frames (other-gt-interp.zip) found."]
+        lines += ["Skipped: no ground-truth interpolated frames found."]
     return "\n".join(lines) + "\n"
 
 
@@ -267,16 +331,17 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--data", type=Path, default=ROOT / "eval" / "data")
     ap.add_argument("--download", action="store_true")
+    ap.add_argument("--source", choices=("auto", "middlebury", "opencv"), default="auto")
     ap.add_argument("--backend", default="auto")
     ap.add_argument("--out", type=Path, default=None)
     args = ap.parse_args()
     if args.download:
         try:
-            download(args.data)
+            download(args.data, args.source)
         except DownloadError as e:
             print(f"\nDownload failed: {e}", file=sys.stderr)
             print(
-                "vision.middlebury.edu may be down or unreachable from this network. Download "
+                "Check the network, or download "
                 + ", ".join(ARCHIVES)
                 + " from https://vision.middlebury.edu/flow/data/ in a browser, unzip them into one folder "
                 "and rerun with --data <folder>.",
@@ -284,9 +349,13 @@ def main() -> None:
             )
             sys.exit(2)
     if not any(args.data.glob("**/flow10.flo")):
-        sys.exit(f"no Middlebury data in {args.data}; run with --download, or pass --data <folder>")
+        sys.exit(f"no evaluation data in {args.data}; run with --download, or pass --data <folder>")
     params = FlowParams(damping=0.05, median=True)
-    md = report(evaluate_flow(args.data, args.backend, params), evaluate_interp(args.data, args.backend, params))
+    md = report(
+        evaluate_flow(args.data, args.backend, params),
+        evaluate_interp(args.data, args.backend, params),
+        data_note(args.data),
+    )
     print(md)
     if args.out:
         args.out.write_text(md)
