@@ -6,6 +6,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Callable
 
+import cv2
 import numpy as np
 
 from .backends import get_engine
@@ -146,7 +147,10 @@ def render(
         ink_mask = cur.ink > 0.35
         motion = float(np.linalg.norm(f01[ink_mask], axis=-1).mean()) if ink_mask.any() else 0.0
         result.pairs.append(PairStats(i, flow_ms, synth_ms, motion))
-        viz = flow_to_rgb(f01 * (cur.field > 0.2)[..., None])
+        # Colour the flow only where there is ink (slightly dilated) so the
+        # visualisation reads as "which strokes move where".
+        near_ink = cv2.dilate((cur.ink > 0.35).astype(np.uint8), np.ones((7, 7), np.uint8)) > 0
+        viz = flow_to_rgb(f01 * near_ink[..., None]) if opts.source != "photo" else flow_to_rgb(f01)
         if on_flow:
             on_flow(i, viz)
         else:

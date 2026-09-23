@@ -60,15 +60,43 @@ def _smoothstep(lo: float, hi: float, x: np.ndarray) -> np.ndarray:
     return t * t * (3 - 2 * t)
 
 
-def ink_from_scan(rgb: np.ndarray, lo: float = 0.18, hi: float = 0.5) -> np.ndarray:
-    """Ink strength in [0, 1] for a photographed/scanned page."""
+def ink_from_scan(rgb: np.ndarray, lo: float = 0.18, hi: float = 0.5, chroma_penalty: float = 0.6) -> np.ndarray:
+    """Ink strength in [0, 1] for a photographed/scanned page.
+
+    Darkness is measured on max(R, G, B) against a local paper estimate, so light
+    coloured print (blue rules) vanishes and lighting gradients cancel. Printed
+    lines that scanners render darker (the magenta margin) are still strongly
+    coloured, while pencil and black pen are grey, so the colour a thin line adds
+    over its surroundings is subtracted. Blue ballpoint keeps a weaker but visible
+    stroke.
+    """
     h = rgb.shape[0]
-    v = rgb.max(axis=2).astype(np.float32) / 255.0
+    f = rgb.astype(np.float32) / 255.0
+    v = f.max(axis=2)
+    chroma = v - f.min(axis=2)
     k = _odd(0.012 * h)
     paper = cv2.dilate(v, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k, k)))
     paper = cv2.GaussianBlur(paper, (0, 0), 0.01 * h)
     darkness = np.clip((paper - v) / np.maximum(paper, 1e-3), 0.0, 1.0)
-    return _smoothstep(lo, hi, darkness).astype(np.float32)
+    # Only colour that thin lines add on top of their surroundings counts: pencil
+    # drawn over a blue ink stain is bluish too, and must survive.
+    local = cv2.morphologyEx(chroma, cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k, k)))
+    excess = np.clip(chroma - local, 0.0, 1.0)
+    ink = _smoothstep(lo, hi, darkness - chroma_penalty * excess)
+    return remove_specks(ink.astype(np.float32))
+
+
+def remove_specks(ink: np.ndarray, min_area: int = 10) -> np.ndarray:
+    """Drop isolated dust / JPEG specks smaller than ``min_area`` pixels."""
+    mask = (ink > 0.25).astype(np.uint8)
+    n, labels, stats, _ = cv2.connectedComponentsWithStats(mask, connectivity=8)
+    small = np.zeros(n, bool)
+    small[1:] = stats[1:, cv2.CC_STAT_AREA] < min_area
+    out = ink.copy()
+    out[small[labels]] = 0.0
+    weak = (ink > 0) & (mask == 0)
+    out[weak & (cv2.dilate(mask, np.ones((5, 5), np.uint8)) == 0)] = 0.0  # faint haze far from any stroke
+    return out
 
 
 def ink_from_drawing(rgb: np.ndarray) -> np.ndarray:
@@ -81,7 +109,7 @@ def remove_hole_punches(ink: np.ndarray) -> np.ndarray:
     """Zero out round, filled blobs near the left/right page edge (binder holes)."""
     h, w = ink.shape
     r = max(2, round(0.005 * h))
-    mask = (ink > 0.5).astype(np.uint8)
+    mask = (ink > 0.25).astype(np.uint8)
     thick = cv2.morphologyEx(mask, cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * r + 1, 2 * r + 1)))
     n, labels, stats, cents = cv2.connectedComponentsWithStats(thick)
     out = ink.copy()
@@ -90,8 +118,9 @@ def remove_hole_punches(ink: np.ndarray) -> np.ndarray:
         x, y, bw, bh, area = stats[i]
         cx = cents[i][0]
         near_edge = cx < 0.12 * w or cx > 0.88 * w
+        at_border = cx < 0.05 * w or cx > 0.95 * w  # holes cut off by the scan crop are crescents
         round_ish = 0.6 < bw / max(bh, 1) < 1.6 and area > 0.5 * bw * bh
-        if near_edge and round_ish and min_area <= area <= max_area:
+        if near_edge and (round_ish or at_border) and min_area / 3 <= area <= max_area:
             blob = (labels == i).astype(np.uint8)
             blob = cv2.dilate(blob, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (4 * r + 1, 4 * r + 1)))
             out[blob > 0] = 0.0
