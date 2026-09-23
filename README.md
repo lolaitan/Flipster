@@ -113,12 +113,27 @@ Measured on a 2-vCPU cloud VM without a GPU ([bench/results/cloud-2vcpu.md](benc
 machine. That adds rows for the optimized and naive CUDA kernels (kernel time via CUDA events, with PCIe copies in the
 JSON). For per-kernel profiles, run `nsys profile build/flipster_bench --backend cuda` or `ncu --set full ...`.
 
-**Accuracy:** run `python eval/middlebury.py --download --out eval/results.md`. It reports end-point / angular error
-against Middlebury ground-truth flow, and PSNR / SSIM of the synthesized midpoint against Middlebury's ground-truth
-interpolated frames. Methods compared: cross-dissolve, v1's backward warp (with its bugs fixed) and Flipster's
-splatting. When vision.middlebury.edu is unreachable (common from cloud machines), it falls back to the copy of
-Middlebury's RubberWhale sequence in OpenCV's test data, plus leave-one-out interpolation on two real video clips
-from the same folder.
+**Accuracy:** `python eval/middlebury.py --download --out eval/results.md` compares against ground truth
+([eval/results.md](eval/results.md)). vision.middlebury.edu is often unreachable from cloud machines, so by default it
+falls back to the copy of Middlebury's RubberWhale sequence in OpenCV's test data, plus leave-one-out interpolation on
+two real video clips from the same folder (frames 0 and 2 in, frame 1 held out). Current results:
+
+| flow, RubberWhale | end-point error (px) |
+|---|---|
+| **Flipster pyramidal LK** | **0.325** |
+| OpenCV Farneback | 0.361 |
+| OpenCV DIS (medium) | 0.223 |
+
+| midpoint interpolation | Corridor-VGA | Street-720p | mean PSNR | mean SSIM |
+|---|---|---|---|---|
+| Cross-dissolve | 28.74 dB | 20.36 dB | 24.55 dB | 0.72 |
+| Backward warp (v1's approach, bugs fixed) | 34.68 dB | 21.96 dB | 28.32 dB | 0.81 |
+| **Flipster forward splatting** | 34.63 dB | 22.03 dB | **28.33 dB** | 0.81 |
+
+The flow is more accurate than Farneback and less accurate than DIS. Both flow-based interpolators beat cross-dissolve
+by ~3.8 dB. On textured photos, splatting and backward warping come out even: splatting pays off on thin line art,
+where backward warping can't move a stroke farther than its own width. Natural video isn't what Flipster is tuned for,
+so treat this as a sanity check of the core algorithm.
 
 ## Running it
 
