@@ -78,7 +78,7 @@ class Storage:
 
     def get_project(self, pid: str) -> dict[str, Any]:
         with self._lock:
-            return json.loads((self._pdir(pid) / "project.json").read_text())
+            return self._read(self._pdir(pid) / "project.json")
 
     def _save_project(self, meta: dict[str, Any]) -> None:
         self._write(self._pdir(meta["id"]) / "project.json", meta)
@@ -174,7 +174,7 @@ class Storage:
         p = self.rdir(rid) / "meta.json"
         if not p.exists():
             raise NotFound(rid)
-        return json.loads(p.read_text())
+        return self._read(p)
 
     def update_render(self, rid: str, **fields: Any) -> None:
         with self._lock:
@@ -207,7 +207,26 @@ class Storage:
         return removed
 
     @staticmethod
+    def _read(path: Path) -> Any:
+        for attempt in range(20):
+            try:
+                return json.loads(path.read_text())
+            except PermissionError:  # Windows: file is being replaced right now
+                if attempt == 19:
+                    raise
+                time.sleep(0.01)
+
+    @staticmethod
     def _write(path: Path, obj: Any) -> None:
-        tmp = path.with_suffix(".tmp")
+        tmp = path.with_suffix(f".{threading.get_ident()}.tmp")
         tmp.write_text(json.dumps(obj))
-        tmp.replace(path)
+        # On Windows the atomic replace fails while another thread has the target
+        # open for reading; that window is tiny, so retry briefly.
+        for attempt in range(20):
+            try:
+                tmp.replace(path)
+                return
+            except PermissionError:
+                if attempt == 19:
+                    raise
+                time.sleep(0.01)

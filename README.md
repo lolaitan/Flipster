@@ -120,7 +120,14 @@ splatting.
 
 ## Running it
 
-### Docker (easiest)
+### Windows (one click)
+
+Double-click **`scripts\windows\setup.cmd`**. It finds Python, creates `.venv`, builds the C++ engine with Visual
+Studio's compiler (and the CUDA engine when an NVIDIA GPU and the CUDA Toolkit are present), builds the web app, runs
+the tests, then opens http://127.0.0.1:8000. Without a C++ compiler it falls back to the NumPy engine, so the app
+still runs. After that, `scripts\windows\run.cmd` just starts the app. The full log is in `data\setup\setup.log`.
+
+### Docker
 
 ```bash
 docker compose up                   # CPU build → http://localhost:8000
