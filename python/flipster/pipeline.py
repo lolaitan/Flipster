@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Callable
 
 import cv2
 import numpy as np
@@ -66,6 +66,28 @@ def _to_rgb8(img: np.ndarray, style: str) -> np.ndarray:
     if style == "clean":
         return to_uint8(render_clean(img[..., 0]))
     return to_uint8(img)
+
+
+def match_ink_mass(ink: np.ndarray, target: float, iters: int = 24) -> np.ndarray:
+    """Thin an in-between so its total ink equals ``target``.
+
+    Softmax splatting lets a stroke win over the paper it lands on, but with
+    bilinear splats that also lets it win the half-covered pixels beside it, so
+    in-betweens come out ~1 px bolder than the pages and the animation flickers.
+    Total ink should interpolate linearly between two pages, so we raise a black
+    point until it does: that trims the faint spill and keeps stroke cores.
+    """
+    if target <= 0 or ink.sum() <= target:
+        return ink
+    lo, hi = 0.0, 0.95
+    for _ in range(iters):
+        s = 0.5 * (lo + hi)
+        if np.clip((ink - s) / (1 - s), 0, 1).sum() > target:
+            lo = s
+        else:
+            hi = s
+    s = 0.5 * (lo + hi)
+    return np.clip((ink - s) / (1 - s), 0, 1).astype(np.float32)
 
 
 def render(
@@ -140,8 +162,12 @@ def render(
         imp0 = cur.ink if opts.source != "photo" else None
         imp1 = nxt.ink if opts.source != "photo" else None
         engine.set_pair(c0, c1, imp0, imp1, f01, f10, opts.splat)
+        mass0, mass1 = float(cur.ink.sum()), float(nxt.ink.sum())
         for t in ts:
-            emit(_to_rgb8(engine.synthesize(t), opts.style), False, i, t)
+            out = engine.synthesize(t)
+            if opts.style == "clean":
+                out = match_ink_mass(out[..., 0], (1 - t) * mass0 + t * mass1)[..., None]
+            emit(_to_rgb8(out, opts.style), False, i, t)
         synth_ms = (time.perf_counter() - s0) * 1e3
 
         ink_mask = cur.ink > 0.35
