@@ -3,6 +3,8 @@
 **Turn a hand-drawn flipbook into smooth animation.** Flipster reads scans of notebook pages (or pages you draw in the
 browser), tracks every pencil stroke from one page to the next with dense **pyramidal Lucas–Kanade optical flow**
 written in **C++/OpenMP and CUDA**, and draws the in-between frames with **occlusion-aware forward splatting**.
+On a free Colab Tesla T4 the CUDA engine computes a 1080p flow field in **16.6 ms**, 59× faster than the multithreaded
+C++ engine ([benchmarks](#performance)).
 
 <p align="center"><img src="docs/demo.gif" alt="20 scanned pages vs. the same flipbook with 3 generated in-betweens per page" width="860"></p>
 
@@ -90,28 +92,45 @@ each now pinned by a test in [`tests/test_legacy_bugs.py`](tests/test_legacy_bug
    moving 38 → 40 was drawn at 37 and 41 instead of 39).
 3. **Single level, single iteration.** This only works for ~1 px of motion, which is why v1 shrank pages to 1/10 size.
 
-It was also a per-pixel Python loop calling `cond()` and `pinv()`, estimated at ~105 s per flow field at 1080p on the
-machine below.
+It was also a per-pixel Python loop calling `cond()` and `pinv()`, estimated at ~225 s per flow field at 1080p on the
+Colab machine below (~105 s on a faster 2-vCPU VM).
 
 ## Performance
 
-`python bench/run_bench.py` runs every backend on the same textured 1080p/720p/480p pair with a known 12.5 × −7.25 px
+`python bench/run_bench.py` runs every backend on the same textured image pair (480p to 4K) with a known 12.5 × −7.25 px
 shift, so the table shows speed *and* end-point error. OpenCV's Farneback and DIS are included as familiar dense-flow
 reference points (they are different algorithms).
 
-Measured on a 2-vCPU cloud VM without a GPU ([bench/results/cloud-2vcpu.md](bench/results/cloud-2vcpu.md)):
+Measured on a free Google Colab **Tesla T4** (Xeon @ 2.0 GHz, 2 threads)
+([bench/results/colab-tesla-t4.md](bench/results/colab-tesla-t4.md)). CUDA rows are kernel time from CUDA events:
 
-| method | 480p | 720p | 1080p | EPE (px) |
-|---|---|---|---|---|
-| v1 (15-112) Python loop | ~14.4 s (est.) | ~46.9 s (est.) | ~104.9 s (est.) | — |
-| NumPy reference (vectorized) | 345 ms | 1.1 s | 2.7 s | 0.045 |
-| **C++ / OpenMP (2 threads)** | **71 ms** | **185 ms** | **459 ms** | 0.045 |
-| OpenCV Farneback | 73 ms | 221 ms | 599 ms | 0.042 |
-| OpenCV DIS (medium) | 26 ms | 70 ms | 178 ms | 0.045 |
+| method | 480p | 720p | 1080p | 4K | EPE (px) |
+|---|---|---|---|---|---|
+| v1 (15-112) Python loop | ~32.9 s (est.) | ~110.5 s (est.) | ~225.1 s (est.) | ~899 s (est.) | — |
+| NumPy reference (vectorized) | 709 ms | 1.5 s | 3.3 s | 15.1 s | 0.045 |
+| C++ / OpenMP (2 threads) | 132 ms | 425 ms | 975 ms | 4.6 s | 0.045 |
+| **CUDA, shared-memory box filter** | **3.1 ms** | **7.8 ms** | **16.6 ms** | **51.3 ms** | 0.045 |
+| CUDA, naive box filter | 15.3 ms | 24.2 ms | 46.6 ms | 204 ms | 0.045 |
+| OpenCV Farneback | 96 ms | 309 ms | 819 ms | 3.5 s | 0.042 |
+| OpenCV DIS (medium) | 45 ms | 132 ms | 540 ms | 1.5 s | 0.044 |
 
-**GPU numbers:** run `python bench/run_bench.py --sizes 480p,720p,1080p,4k --out bench/results/<your-gpu>.md` on a CUDA
-machine. That adds rows for the optimized and naive CUDA kernels (kernel time via CUDA events, with PCIe copies in the
-JSON). For per-kernel profiles, run `nsys profile build/flipster_bench --backend cuda` or `ncu --set full ...`.
+At 1080p the CUDA engine is:
+
+- **59× faster than the multithreaded C++ engine** (16.6 ms vs 975 ms), or 29× counting PCIe copies (33.4 ms wall).
+- **~200× faster than the vectorized NumPy reference** and **~13,500× faster than v1**.
+- **2.8× faster than the naive kernel** thanks to the shared-memory / running-sum box filter (4.0× at 4K, 4.9× at
+  480p), with the same result.
+
+All four Flipster backends land on the same 0.045 px error, and the CUDA-vs-CPU parity tests pass on the T4. The
+Farneback and DIS rows run on the CPU, so compare them with the C++ row, not the GPU rows.
+
+Wall time with host↔device copies is 5.7 / 17.0 / 33.4 / 134 ms (480p → 4K), so at 1080p about half of the end-to-end
+time is spent outside the kernels, mostly on PCIe transfers. That's why `set_pair()` uploads each page pair once and
+keeps it resident for all of its in-betweens. On a faster 2-vCPU VM without a GPU the C++ engine does 1080p in 459 ms
+([bench/results/cloud-2vcpu.md](bench/results/cloud-2vcpu.md)).
+
+To reproduce: `python bench/run_bench.py --sizes 480p,720p,1080p,4k --out bench/results/<your-gpu>.md` (or run the
+Colab notebook). For kernel profiles, use `nsys profile build/flipster_bench --backend cuda` or `ncu --set full ...`.
 
 **Accuracy:** `python eval/middlebury.py --download --out eval/results.md` compares against ground truth
 ([eval/results.md](eval/results.md)). vision.middlebury.edu is often unreachable from cloud machines, so by default it
