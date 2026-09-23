@@ -1,0 +1,121 @@
+{
+  "machine": {
+    "cpu": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+    "cpu_threads": 2,
+    "gpu": null,
+    "python": "3.11.15",
+    "opencv": "4.13.0",
+    "platform": "Linux-6.18.44-fc-v37-x86_64-with-glibc2.39"
+  },
+  "shift": [
+    12.5,
+    -7.25
+  ],
+  "rows": [
+    {
+      "size": "480p",
+      "width": 640,
+      "height": 480,
+      "methods": {
+        "v1 (15-112) Python loop": {
+          "wall_ms": 14359.241875001771,
+          "compute_ms": 14359.241875001771,
+          "epe": null,
+          "estimated": true
+        },
+        "NumPy reference (vectorized)": {
+          "wall_ms": 345.2898165000988,
+          "compute_ms": 345.27634599999146,
+          "epe": 0.044819775968790054
+        },
+        "C++ / OpenMP (2 threads)": {
+          "wall_ms": 70.70162199988772,
+          "compute_ms": 69.650091,
+          "epe": 0.04481971263885498
+        },
+        "OpenCV Farneback": {
+          "wall_ms": 72.65767550006785,
+          "compute_ms": 72.65767550006785,
+          "epe": 0.04242773354053497,
+          "reference": true
+        },
+        "OpenCV DIS (medium)": {
+          "wall_ms": 26.05816049981513,
+          "compute_ms": 26.05816049981513,
+          "epe": 0.044996462762355804,
+          "reference": true
+        }
+      }
+    },
+    {
+      "size": "720p",
+      "width": 1280,
+      "height": 720,
+      "methods": {
+        "v1 (15-112) Python loop": {
+          "wall_ms": 46907.13134999669,
+          "compute_ms": 46907.13134999669,
+          "epe": null,
+          "estimated": true
+        },
+        "NumPy reference (vectorized)": {
+          "wall_ms": 1125.069283999892,
+          "compute_ms": 1125.055727500012,
+          "epe": 0.04475410282611847
+        },
+        "C++ / OpenMP (2 threads)": {
+          "wall_ms": 184.89182899975276,
+          "compute_ms": 182.07313,
+          "epe": 0.04475396126508713
+        },
+        "OpenCV Farneback": {
+          "wall_ms": 221.0870904998501,
+          "compute_ms": 221.0870904998501,
+          "epe": 0.04235677793622017,
+          "reference": true
+        },
+        "OpenCV DIS (medium)": {
+          "wall_ms": 69.61884799989093,
+          "compute_ms": 69.61884799989093,
+          "epe": 0.04203621298074722,
+          "reference": true
+        }
+      }
+    },
+    {
+      "size": "1080p",
+      "width": 1920,
+      "height": 1080,
+      "methods": {
+        "v1 (15-112) Python loop": {
+          "wall_ms": 104911.63874999074,
+          "compute_ms": 104911.63874999074,
+          "epe": null,
+          "estimated": true
+        },
+        "NumPy reference (vectorized)": {
+          "wall_ms": 2725.5069040002127,
+          "compute_ms": 2725.4911009999887,
+          "epe": 0.04474858194589615
+        },
+        "C++ / OpenMP (2 threads)": {
+          "wall_ms": 458.6656579999726,
+          "compute_ms": 451.203777,
+          "epe": 0.04474854841828346
+        },
+        "OpenCV Farneback": {
+          "wall_ms": 599.1519154999878,
+          "compute_ms": 599.1519154999878,
+          "epe": 0.04234863817691803,
+          "reference": true
+        },
+        "OpenCV DIS (medium)": {
+          "wall_ms": 178.350471000158,
+          "compute_ms": 178.350471000158,
+          "epe": 0.042312316596508026,
+          "reference": true
+        }
+      }
+    }
+  ]
+}
