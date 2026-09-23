@@ -1,10 +1,14 @@
 # Flipster
 
+[![CI](https://github.com/lolaitan/Flipster/actions/workflows/ci.yml/badge.svg)](https://github.com/lolaitan/Flipster/actions/workflows/ci.yml)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/lolaitan/Flipster/blob/main/notebooks/flipster_colab.ipynb)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 **Turn a hand-drawn flipbook into smooth animation.** Flipster reads scans of notebook pages (or pages you draw in the
 browser), tracks every pencil stroke from one page to the next with dense **pyramidal Lucas–Kanade optical flow**
 written in **C++/OpenMP and CUDA**, and draws the in-between frames with **occlusion-aware forward splatting**.
-On a free Colab Tesla T4 the CUDA engine computes a 1080p flow field in **16.6 ms**, 59× faster than the multithreaded
-C++ engine ([benchmarks](#performance)).
+On a free Colab Tesla T4 the CUDA kernels compute a 1080p flow field in **16.6 ms**, 59× faster than the C++/OpenMP
+engine on the same machine ([benchmarks](#performance)).
 
 <p align="center"><img src="docs/demo.gif" alt="20 scanned pages vs. the same flipbook with 3 generated in-betweens per page" width="860"></p>
 
@@ -133,15 +137,16 @@ To reproduce: `python bench/run_bench.py --sizes 480p,720p,1080p,4k --out bench/
 Colab notebook). For kernel profiles, use `nsys profile build/flipster_bench --backend cuda` or `ncu --set full ...`.
 
 **Accuracy:** `python eval/middlebury.py --download --out eval/results.md` compares against ground truth
-([eval/results.md](eval/results.md)). vision.middlebury.edu is often unreachable from cloud machines, so by default it
-falls back to the copy of Middlebury's RubberWhale sequence in OpenCV's test data, plus leave-one-out interpolation on
-two real video clips from the same folder (frames 0 and 2 in, frame 1 held out). Current results:
+([eval/results.md](eval/results.md)). By default it uses the copy of Middlebury's RubberWhale sequence in OpenCV's test
+data on GitHub (about 5 MB, always reachable), plus leave-one-out interpolation on two real video clips from the same
+folder (frames 0 and 2 in, frame 1 held out). `--source middlebury` runs the full official set of 8 sequences instead,
+if vision.middlebury.edu is reachable. Current results:
 
 | flow, RubberWhale | end-point error (px) |
 |---|---|
 | **Flipster pyramidal LK** | **0.325** |
 | OpenCV Farneback | 0.361 |
-| OpenCV DIS (medium) | 0.223 |
+| OpenCV DIS (medium) | 0.224 |
 
 | midpoint interpolation | Corridor-VGA | Street-720p | mean PSNR | mean SSIM |
 |---|---|---|---|---|
@@ -184,7 +189,7 @@ docker compose --profile gpu up     # CUDA build → http://localhost:8001 (need
 Requirements:
 
 - Python ≥ 3.10
-- CMake ≥ 3.20 and a C++17 compiler (GCC/Clang, or Visual Studio 2022 Build Tools on Windows)
+- CMake ≥ 3.24 and a C++17 compiler (GCC/Clang, or Visual Studio 2022 Build Tools on Windows)
 - Node 22
 - Optional: CUDA Toolkit 12.x. When `nvcc` is found, the CUDA backend is built automatically.
 
@@ -200,7 +205,7 @@ Force a backend with `FLIPSTER_ENABLE_CUDA=ON|OFF pip install .`. Target only yo
 
 **Windows + NVIDIA:** the simplest route is WSL2 (Ubuntu) with the CUDA toolkit for WSL, then the Linux steps above.
 Native Windows works too: install Visual Studio 2022 Build Tools and the CUDA Toolkit, then run
-`pip install -e .[server,dev]` from a *x64 Native Tools* prompt.
+`pip install -e .[server,dev]` from an *x64 Native Tools* prompt.
 
 ### Tests
 
@@ -224,23 +229,31 @@ core/            C++17 / CUDA engine
   tests/, tools/   GoogleTest suite, native benchmark
 bindings/        pybind11 module (flipster._core)
 python/flipster/ reference implementation, preprocessing, pipeline, export
+tests/           pytest suite: NumPy reference, native engines, parity, v1 bugs, eval
 server/          FastAPI app (projects, jobs, SSE, export) + API tests
 web/             React + TypeScript app
-bench/, eval/    throughput benchmark, Middlebury accuracy harness
+bench/, eval/    throughput benchmark + results, Middlebury accuracy harness
+notebooks/       Colab notebook (GPU build, tests, benchmark, your own flipbook)
+docs/            README figures and the script that regenerates them
 samples/scans/   the 20 original notebook pages
+scripts/windows/ one-click setup and run
 docker/, .github/workflows/
 ```
 
 ## API
 
+Main endpoints (the full, interactive list is at `/docs` when the server is running):
+
 | method | path | |
 |---|---|---|
 | `GET` | `/api/system` | backends, GPU name, limits |
-| `POST` | `/api/projects` | new project (`scan` or `drawing`) |
+| `POST` | `/api/projects` | new project (`scan`, `drawing` or `photo`) |
 | `POST` | `/api/projects/{id}/frames` | upload pages (multipart) |
 | `POST` | `/api/projects/{id}/samples` | load the bundled flipbook |
 | `PUT` | `/api/projects/{id}/frames/order` | reorder |
+| `DELETE` | `/api/projects/{id}/frames/{fid}` | remove a page |
 | `POST` | `/api/projects/{id}/renders` | start a render → `job_id`, `render_id` |
+| `GET` | `/api/jobs/{id}` | job status |
 | `GET` | `/api/jobs/{id}/events` | server-sent progress events |
 | `GET` | `/api/renders/{id}` | frames, flow visualizations, timing summary |
 | `GET` | `/api/renders/{id}/export?format=gif\|mp4` | download |

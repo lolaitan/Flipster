@@ -8,18 +8,19 @@ Two questions, answered on the public training sequences:
 2. Are the in-betweens right?  PSNR / SSIM of the synthesized midpoint against
    the ground-truth frame10i11 that Middlebury provides for interpolation.
 
-    python eval/middlebury.py --download          # a few MB into eval/data
-    python eval/middlebury.py --backend cuda --out eval/results.md
+    python eval/middlebury.py --download --backend cuda --out eval/results.md
 
-Data sources (``--source``, default ``auto`` tries them in this order):
+Data sources (``--source``):
 
-* ``middlebury``: the official archives from vision.middlebury.edu (8 sequences
-  with ground-truth flow, 8 with ground-truth interpolated frames). The site is
-  often unreachable from cloud machines such as Colab.
-* ``opencv``: the copy OpenCV keeps in its test data on GitHub. It has one
-  Middlebury sequence with ground-truth flow (RubberWhale). For interpolation it
-  uses three consecutive frames of two real videos from the same folder: frames
-  0 and 2 go in, and the held-out frame 1 is the ground truth ("leave one out").
+* ``opencv`` (default): the copy of Middlebury data that OpenCV keeps in its
+  test data on GitHub (about 5 MB, reliably reachable). It has one Middlebury
+  sequence with ground-truth flow (RubberWhale). For interpolation it uses three
+  consecutive frames of two real videos from the same folder: frames 0 and 2 go
+  in, and the held-out frame 1 is the ground truth ("leave one out").
+* ``middlebury``: the official archives from vision.middlebury.edu, a broader
+  test (8 sequences with ground-truth flow, 8 with ground-truth interpolated
+  frames). The site is slow and often unreachable from cloud machines.
+* ``auto``: try ``middlebury`` once, and fall back to ``opencv``.
 
 You can also download the Middlebury zips in a browser, unzip them into one
 folder and pass it with --data.
@@ -137,7 +138,7 @@ def download_opencv(dest: Path) -> None:
                 (d / local).write_bytes(fetch(remote, bases=(OPENCV_BASE,)))
 
 
-def download(dest: Path, source: str = "auto") -> str:
+def download(dest: Path, source: str = "opencv") -> str:
     """Download evaluation data; returns the source actually used."""
     if source in ("auto", "middlebury"):
         try:
@@ -318,9 +319,9 @@ def report(flow_rows: list[FlowRow], interp_rows: list[InterpRow], note: str = "
     lines = [note, ""] if note else []
     lines += ["### Flow accuracy (frame10 → frame11)", "", "Average end-point error in pixels (lower is better).", ""]
     lines += _table(flow_rows, "aee", "aae", ".3f", "AEE", "AAE°")
-    lines += ["", "### Midpoint interpolation (frame10i11)", ""]
+    lines += ["", "### Midpoint interpolation", ""]
     if interp_rows:
-        lines += ["PSNR in dB (higher is better).", ""]
+        lines += ["PSNR of the synthesized midpoint vs. the held-out ground-truth frame, in dB (higher is better).", ""]
         lines += _table(interp_rows, "psnr", "ssim", ".2f", "PSNR", "SSIM")
     else:
         lines += ["Skipped: no ground-truth interpolated frames found."]
@@ -331,7 +332,7 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--data", type=Path, default=ROOT / "eval" / "data")
     ap.add_argument("--download", action="store_true")
-    ap.add_argument("--source", choices=("auto", "middlebury", "opencv"), default="auto")
+    ap.add_argument("--source", choices=("opencv", "middlebury", "auto"), default="opencv")
     ap.add_argument("--backend", default="auto")
     ap.add_argument("--out", type=Path, default=None)
     args = ap.parse_args()
@@ -340,13 +341,16 @@ def main() -> None:
             download(args.data, args.source)
         except DownloadError as e:
             print(f"\nDownload failed: {e}", file=sys.stderr)
-            print(
-                "Check the network, or download "
-                + ", ".join(ARCHIVES)
-                + " from https://vision.middlebury.edu/flow/data/ in a browser, unzip them into one folder "
-                "and rerun with --data <folder>.",
-                file=sys.stderr,
-            )
+            if args.source == "opencv":
+                hint = f"Check the network (the files come from {OPENCV_BASE}), or rerun with --source middlebury."
+            else:
+                hint = (
+                    "Check the network, or download "
+                    + ", ".join(ARCHIVES)
+                    + " from https://vision.middlebury.edu/flow/data/ in a browser, unzip them into one folder "
+                    "and rerun with --data <folder>."
+                )
+            print(hint, file=sys.stderr)
             sys.exit(2)
     if not any(args.data.glob("**/flow10.flo")):
         sys.exit(f"no evaluation data in {args.data}; run with --download, or pass --data <folder>")

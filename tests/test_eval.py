@@ -123,7 +123,7 @@ def test_download_gives_up_cleanly_and_skips_optional(monkeypatch, tmp_path):
     import pytest
 
     with pytest.raises(mb.DownloadError):
-        mb.download(tmp_path)
+        mb.download(tmp_path, "middlebury")
 
     def only_required(req, timeout):
         if "interp" in req.full_url:
@@ -131,21 +131,35 @@ def test_download_gives_up_cleanly_and_skips_optional(monkeypatch, tmp_path):
         return _Resp(_zip_bytes())
 
     monkeypatch.setattr(mb.urllib.request, "urlopen", only_required)
-    mb.download(tmp_path)  # optional archive missing: no exception
+    mb.download(tmp_path, "middlebury")  # optional archive missing: no exception
     assert (tmp_path / ".other-gt-flow.zip.done").exists()
     assert not (tmp_path / ".other-gt-interp.zip.done").exists()
 
 
 def test_main_exits_with_instructions_when_offline(monkeypatch, tmp_path, capsys):
-    monkeypatch.setattr(mb.urllib.request, "urlopen", lambda req, timeout: (_ for _ in ()).throw(TimeoutError("x")))
-    monkeypatch.setattr(mb.time, "sleep", lambda s: None)
-    monkeypatch.setattr(mb.sys, "argv", ["middlebury.py", "--download", "--data", str(tmp_path)])
     import pytest
 
-    with pytest.raises(SystemExit) as e:
-        mb.main()
-    assert e.value.code == 2
-    assert "--data" in capsys.readouterr().err
+    monkeypatch.setattr(mb.urllib.request, "urlopen", lambda req, timeout: (_ for _ in ()).throw(TimeoutError("x")))
+    monkeypatch.setattr(mb.time, "sleep", lambda s: None)
+    for source, hint in [("opencv", "--source middlebury"), ("middlebury", "--data")]:
+        argv = ["middlebury.py", "--download", "--source", source, "--data", str(tmp_path / source)]
+        monkeypatch.setattr(mb.sys, "argv", argv)
+        with pytest.raises(SystemExit) as e:
+            mb.main()
+        assert e.value.code == 2
+        assert hint in capsys.readouterr().err
+
+
+def test_default_source_is_opencv(monkeypatch, tmp_path):
+    urls = []
+
+    def fake_urlopen(req, timeout):
+        urls.append(req.full_url)
+        return _Resp(b"x")
+
+    monkeypatch.setattr(mb.urllib.request, "urlopen", fake_urlopen)
+    assert mb.download(tmp_path) == "opencv"
+    assert urls and all(u.startswith(mb.OPENCV_BASE) for u in urls)
 
 
 def test_falls_back_to_opencv_copy(monkeypatch, tmp_path):
@@ -164,7 +178,7 @@ def test_falls_back_to_opencv_copy(monkeypatch, tmp_path):
     monkeypatch.setattr(mb.urllib.request, "urlopen", fake_urlopen)
     monkeypatch.setattr(mb.time, "sleep", lambda s: None)
     data = tmp_path / "data"
-    assert mb.download(data) == "opencv"
+    assert mb.download(data, "auto") == "opencv"
     assert (data / "opencv" / "RubberWhale" / "flow10.flo").exists()
     assert (data / "opencv" / "Street-720p" / "frame10i11.png").exists()
     assert "OpenCV" in mb.data_note(data)

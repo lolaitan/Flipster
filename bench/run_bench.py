@@ -6,7 +6,7 @@ amount, so the table also reports end-point error (EPE): a fast backend that
 computes the wrong thing would show up immediately.
 
     python bench/run_bench.py                 # 480p / 720p / 1080p
-    python bench/run_bench.py --sizes 4k      # add 3840x2160
+    python bench/run_bench.py --sizes 480p,720p,1080p,4k
     python bench/run_bench.py --reps 10 --out bench/results/my-machine.md
 
 Timing notes

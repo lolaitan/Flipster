@@ -19,7 +19,7 @@ from app.main import create_app  # noqa: E402
 
 @pytest.fixture()
 def client(tmp_path):
-    settings = replace(load_settings(), data_dir=tmp_path / "data", web_dist=tmp_path / "nope", max_frames=6)
+    settings = replace(load_settings(), data_dir=tmp_path / "data", web_dist=tmp_path / "no-web-dist", max_frames=6)
     with TestClient(create_app(settings)) as c:
         yield c
 

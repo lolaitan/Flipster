@@ -6,16 +6,16 @@ Average end-point error in pixels (lower is better).
 
 | method | RubberWhale | **mean AEE** | mean AAE° |
 |---|---|---|---|
-| Flipster LK (numpy) | 0.325 | **0.325** | 10.565 |
+| Flipster LK (cpu) | 0.325 | **0.325** | 10.565 |
 | OpenCV Farneback | 0.361 | **0.361** | 12.330 |
-| OpenCV DIS (medium) | 0.223 | **0.223** | 7.303 |
+| OpenCV DIS (medium) | 0.224 | **0.224** | 7.307 |
 
-### Midpoint interpolation (frame10i11)
+### Midpoint interpolation
 
-PSNR in dB (higher is better).
+PSNR of the synthesized midpoint vs. the held-out ground-truth frame, in dB (higher is better).
 
 | method | Corridor-VGA | Street-720p | **mean PSNR** | mean SSIM |
 |---|---|---|---|---|
 | Cross-dissolve | 28.74 | 20.36 | **24.55** | 0.72 |
 | Backward warp (v1 method, fixed) | 34.68 | 21.96 | **28.32** | 0.81 |
-| Flipster splat (numpy) | 34.63 | 22.03 | **28.33** | 0.81 |
+| Flipster splat (cpu) | 34.63 | 22.03 | **28.33** | 0.81 |

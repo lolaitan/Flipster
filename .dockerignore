@@ -7,3 +7,6 @@ web/dist
 eval/data
 bench/results/*.local.*
 *.pyc
+.venv
+.pytest_cache
+.ruff_cache

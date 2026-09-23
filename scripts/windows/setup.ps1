@@ -67,7 +67,7 @@ if (-not $py) {
 Write-Log ("   Python " + $py.Version + " at " + $py.Exe)
 
 $node = Get-Command npm.cmd -ErrorAction SilentlyContinue
-if ($node) { Write-Log ("   npm at " + $node.Source) } else { Write-Log '   npm not found (install Node.js 20+ from https://nodejs.org to build the web app)' 'Yellow' }
+if ($node) { Write-Log ("   npm at " + $node.Source) } else { Write-Log '   npm not found (install Node.js 22 LTS from https://nodejs.org to build the web app)' 'Yellow' }
 
 # Visual Studio C++ tools
 $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'

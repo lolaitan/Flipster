@@ -39,17 +39,22 @@ jobs:
           cmake --build build
 
   python:
-    name: Python package + API
+    name: Python ${{ matrix.python }} package + API
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.10", "3.12"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: ${{ matrix.python }}
           cache: pip
       - name: Install (builds the C++ extension)
         run: pip install ".[server,dev]"
       - name: Lint
+        if: matrix.python == '3.12'
         run: |
           ruff check python server tests bench eval docs notebooks
           ruff format --check python server tests bench eval docs notebooks

@@ -55,10 +55,6 @@ class JobManager:
         self._lock = threading.Lock()
         self._pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="render")
 
-    def get(self, job_id: str) -> Job | None:
-        with self._lock:
-            return self._jobs.get(job_id)
-
     def snapshot(self, job_id: str) -> tuple[int, dict[str, Any]] | None:
         with self._lock:
             job = self._jobs.get(job_id)

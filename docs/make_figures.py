@@ -55,14 +55,14 @@ def main() -> None:
         fr = [f for f in res.frames if f.source == pair] + [f for f in res.frames if f.source == pair + 1 and f.key]
         return np.hstack([crop(f.image)[:, 60:-20] for f in fr])
 
-    for pair in (4, 13):
-        a = label(strip(lin, pair), "Cross-fade (what naive interpolation gives you)")
-        b = label(strip(flow, pair), "Flipster: pyramidal LK flow + occlusion-aware splatting")
-        out = np.vstack([a, np.full((10, a.shape[1], 3), 235, np.uint8), b])
-        s = 1400 / out.shape[1]
-        Image.fromarray(out).resize((1400, round(out.shape[0] * s)), Image.LANCZOS).save(
-            DOCS / f"inbetween_pair{pair + 1}.png", optimize=True
-        )
+    pair = 13  # pages 14 -> 15
+    a = label(strip(lin, pair), "Cross-fade (what naive interpolation gives you)")
+    b = label(strip(flow, pair), "Flipster: pyramidal LK flow + occlusion-aware splatting")
+    out = np.vstack([a, np.full((10, a.shape[1], 3), 235, np.uint8), b])
+    s = 1400 / out.shape[1]
+    Image.fromarray(out).resize((1400, round(out.shape[0] * s)), Image.LANCZOS).save(
+        DOCS / f"inbetween_pair{pair + 1}.png", optimize=True
+    )
 
     keys = [f for f in flow.frames if f.key]
     w = 420
@@ -78,14 +78,6 @@ def main() -> None:
         gap = np.full((left.shape[0], 8, 3), 235, np.uint8)
         frames.append(Image.fromarray(np.hstack([left, gap, right])).convert("P", palette=Image.ADAPTIVE, colors=32))
     frames[0].save(DOCS / "demo.gif", save_all=True, append_images=frames[1:], duration=83, loop=0, optimize=True)
-
-    viz = flow.flow_images[13]
-    page = next(k for k in keys if k.source == 13).image
-    blend = (page.astype(np.float32) * viz.astype(np.float32) / 255).astype(np.uint8)
-    c = crop(blend)[:, 60:-20]
-    Image.fromarray(c).resize((900, round(c.shape[0] * 900 / c.shape[1])), Image.LANCZOS).save(
-        DOCS / "flow_pair14.png", optimize=True
-    )
 
 
 if __name__ == "__main__":
