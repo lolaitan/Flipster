@@ -1,8 +1,8 @@
 import numpy as np
 import pytest
+from synth import translated_pair
 
 from flipster import FlowParams, available_backends, get_engine
-from synth import translated_pair
 
 BACKENDS = list(available_backends())
 

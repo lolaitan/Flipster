@@ -227,7 +227,9 @@ def compose(c0, c1, s0, s1, t: float, sp: SplatParams) -> np.ndarray:
     k1 = t * (m + (1 - m) * a1r / safe1) * cov1
     tot = k0 + k1
     has = tot > 0
-    out = (k0[..., None] * a0c / safe0[..., None] + k1[..., None] * a1c / safe1[..., None]) / np.where(has, tot, 1.0)[..., None]
+    out = (k0[..., None] * a0c / safe0[..., None] + k1[..., None] * a1c / safe1[..., None]) / np.where(has, tot, 1.0)[
+        ..., None
+    ]
     fallback = (1 - t) * c0 + t * c1
     return np.where(has[..., None], out, fallback).astype(np.float32)
 
@@ -269,8 +271,15 @@ class NumpyEngine:
         r0 = fb_reliability(f01, f10, sp)
         r1 = fb_reliability(f10, f01, sp)
         self._pair = dict(
-            c0=c0, c1=c1, w0=np.exp(sp.softmax_beta * imp0), w1=np.exp(sp.softmax_beta * imp1),
-            r0=r0, r1=r1, f01=np.asarray(f01, np.float32), f10=np.asarray(f10, np.float32), sp=sp,
+            c0=c0,
+            c1=c1,
+            w0=np.exp(sp.softmax_beta * imp0),
+            w1=np.exp(sp.softmax_beta * imp1),
+            r0=r0,
+            r1=r1,
+            f01=np.asarray(f01, np.float32),
+            f10=np.asarray(f10, np.float32),
+            sp=sp,
         )
         self.last_timings = {"set_pair_ms": (time.perf_counter() - t0) * 1e3}
 

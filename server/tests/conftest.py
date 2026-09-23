@@ -10,10 +10,11 @@ from PIL import Image
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "tests"))
 
-from app.config import load_settings  # noqa: E402
-from app.main import create_app  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 from synth import stick_figure  # noqa: E402
+
+from app.config import load_settings  # noqa: E402
+from app.main import create_app  # noqa: E402
 
 
 @pytest.fixture()

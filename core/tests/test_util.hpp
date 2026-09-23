@@ -1,6 +1,7 @@
 // Synthetic inputs with analytically known motion.
 #pragma once
 
+#include <algorithm>
 #include <cmath>
 #include <random>
 #include <vector>

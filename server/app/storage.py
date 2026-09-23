@@ -104,7 +104,9 @@ class Storage:
             thumb = im.convert("RGB")
             thumb.thumbnail((THUMB_SIDE, THUMB_SIDE))
             thumb.save(d / f"{fid}_t.jpg", quality=82)
-            meta["frames"].append({"id": fid, "name": name[:120], "file": path.name, "width": im.width, "height": im.height})
+            meta["frames"].append(
+                {"id": fid, "name": name[:120], "file": path.name, "width": im.width, "height": im.height}
+            )
             self._save_project(meta)
             return meta
 
@@ -154,8 +156,18 @@ class Storage:
         d = self.renders / rid
         (d / "frames").mkdir(parents=True)
         (d / "flow").mkdir()
-        self._write(d / "meta.json", {"id": rid, "project_id": pid, "status": "queued", "options": options,
-                                      "summary": None, "frames": [], "flows": 0})
+        self._write(
+            d / "meta.json",
+            {
+                "id": rid,
+                "project_id": pid,
+                "status": "queued",
+                "options": options,
+                "summary": None,
+                "frames": [],
+                "flows": 0,
+            },
+        )
         return rid
 
     def get_render(self, rid: str) -> dict[str, Any]:

@@ -46,4 +46,7 @@ target-version = "py310"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP"]
-ignore = ["E731"]
+ignore = ["E731", "B008"]  # B008: FastAPI File()/Query() defaults are idiomatic
+
+[tool.ruff.lint.isort]
+known-first-party = ["flipster", "app"]

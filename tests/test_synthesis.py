@@ -1,8 +1,8 @@
 import numpy as np
 import pytest
-
-from flipster import FlowParams, SplatParams, available_backends, get_engine
 from synth import stick_figure
+
+from flipster import SplatParams, available_backends, get_engine
 
 BACKENDS = list(available_backends())
 

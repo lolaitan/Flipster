@@ -52,7 +52,9 @@ class NativeEngine:
         return cp
 
     def flow(self, a, b, params: FlowParams | None = None) -> np.ndarray:
-        return self._e.flow(np.ascontiguousarray(a, np.float32), np.ascontiguousarray(b, np.float32), self._flow_params(params))
+        return self._e.flow(
+            np.ascontiguousarray(a, np.float32), np.ascontiguousarray(b, np.float32), self._flow_params(params)
+        )
 
     def warp(self, img, flow) -> np.ndarray:
         img = np.ascontiguousarray(img, np.float32)
@@ -69,7 +71,15 @@ class NativeEngine:
         z = np.zeros((h, w), np.float32)
         imp0 = z if imp0 is None else np.ascontiguousarray(imp0, np.float32)
         imp1 = z if imp1 is None else np.ascontiguousarray(imp1, np.float32)
-        self._e.set_pair(c0, c1, imp0, imp1, np.ascontiguousarray(f01, np.float32), np.ascontiguousarray(f10, np.float32), self._splat_params(sp))
+        self._e.set_pair(
+            c0,
+            c1,
+            imp0,
+            imp1,
+            np.ascontiguousarray(f01, np.float32),
+            np.ascontiguousarray(f10, np.float32),
+            self._splat_params(sp),
+        )
 
     def reliability(self):
         return self._e.reliability()

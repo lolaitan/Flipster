@@ -231,7 +231,7 @@ def prepare_frames(
                 progress(i / (len(resized) - 1))
 
     frames = []
-    for im, ink, tf in zip(resized, inks, transforms):
+    for im, ink, tf in zip(resized, inks, transforms, strict=True):
         flags = cv2.INTER_LINEAR | cv2.WARP_INVERSE_MAP
         rgb = cv2.warpAffine(im, tf, size, flags=flags, borderMode=cv2.BORDER_REPLICATE)
         ink_a = cv2.warpAffine(ink, tf, size, flags=flags, borderMode=cv2.BORDER_CONSTANT, borderValue=0)

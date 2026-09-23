@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import io
-from typing import Iterable
+from collections.abc import Iterable
 
 import numpy as np
 from PIL import Image
@@ -23,8 +23,14 @@ def to_gif(frames: Iterable[np.ndarray], fps: float = 12, max_side: int | None =
         raise ValueError("no frames to export")
     buf = io.BytesIO()
     ims[0].save(
-        buf, format="GIF", save_all=True, append_images=ims[1:],
-        duration=max(20, round(1000 / fps)), loop=0 if loop else 1, disposal=2, optimize=True,
+        buf,
+        format="GIF",
+        save_all=True,
+        append_images=ims[1:],
+        duration=max(20, round(1000 / fps)),
+        loop=0 if loop else 1,
+        disposal=2,
+        optimize=True,
     )
     return buf.getvalue()
 
@@ -46,7 +52,9 @@ def to_mp4(frames: Iterable[np.ndarray], fps: float = 12, max_side: int | None =
     fd, path = tempfile.mkstemp(suffix=".mp4")
     os.close(fd)
     try:
-        with imageio.get_writer(path, fps=fps, codec="libx264", quality=8, pixelformat="yuv420p", macro_block_size=2) as w:
+        with imageio.get_writer(
+            path, fps=fps, codec="libx264", quality=8, pixelformat="yuv420p", macro_block_size=2
+        ) as w:
             for a in arrs:
                 w.append_data(a)
         with open(path, "rb") as fh:

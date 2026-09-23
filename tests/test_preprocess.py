@@ -3,6 +3,7 @@ import io
 import cv2
 import numpy as np
 from PIL import Image
+from synth import ruled_page
 
 from flipster.preprocess import (
     estimate_paper_shift,
@@ -13,7 +14,6 @@ from flipster.preprocess import (
     remove_hole_punches,
     soft_field,
 )
-from synth import ruled_page
 
 
 def test_ink_ignores_rules_and_margin():

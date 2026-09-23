@@ -121,11 +121,17 @@ class JobManager:
             summary = result.summary()
             summary["frames"] = len(frames)
             self.storage.update_render(job.render_id, status="done", summary=summary, frames=frames, flows=len(flows))
-            self._update(job, status="done", stage="done", progress=1.0,
-                         message=f"{len(frames)} frames in {summary['total_ms'] / 1000:.1f}s on {summary['backend']}",
-                         finished_at=time.time())
+            self._update(
+                job,
+                status="done",
+                stage="done",
+                progress=1.0,
+                message=f"{len(frames)} frames in {summary['total_ms'] / 1000:.1f}s on {summary['backend']}",
+                finished_at=time.time(),
+            )
         except Exception as exc:  # noqa: BLE001 - surfaced to the client
             traceback.print_exc()
             self.storage.update_render(job.render_id, status="error")
-            self._update(job, status="error", stage="error", error=str(exc), message="Render failed",
-                         finished_at=time.time())
+            self._update(
+                job, status="error", stage="error", error=str(exc), message="Render failed", finished_at=time.time()
+            )

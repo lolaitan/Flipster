@@ -2,9 +2,9 @@
 
 import numpy as np
 import pytest
+from synth import stick_figure, translated_pair
 
 from flipster import FlowParams, SplatParams, available_backends, get_engine
-from synth import stick_figure, translated_pair
 
 NATIVE = [b for b in available_backends() if b != "numpy"]
 pytestmark = pytest.mark.skipif(not NATIVE, reason="native extension not built")
@@ -39,7 +39,9 @@ def test_synthesis_matches_reference(backend):
 @pytest.mark.parametrize("backend", NATIVE)
 def test_warp_matches_reference(backend):
     i0, _ = translated_pair(0, 0, h=60, w=90)
-    flow = np.dstack([np.sin(np.arange(60 * 90).reshape(60, 90) * 0.01) * 4, np.full((60, 90), -1.5)]).astype(np.float32)
+    flow = np.dstack([np.sin(np.arange(60 * 90).reshape(60, 90) * 0.01) * 4, np.full((60, 90), -1.5)]).astype(
+        np.float32
+    )
     np.testing.assert_allclose(get_engine("numpy").warp(i0, flow), get_engine(backend).warp(i0, flow), atol=1e-6)
 
 

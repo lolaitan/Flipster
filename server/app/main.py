@@ -10,7 +10,7 @@ import json
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, File, HTTPException, Query, Request, UploadFile
+from fastapi import FastAPI, File, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -69,7 +69,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             created_at=meta["created_at"],
             frames=[
                 FrameOut(
-                    id=f["id"], name=f["name"], width=f["width"], height=f["height"],
+                    id=f["id"],
+                    name=f["name"],
+                    width=f["width"],
+                    height=f["height"],
                     image_url=f"/api/projects/{pid}/frames/{f['id']}/image",
                     thumb_url=f"/api/projects/{pid}/frames/{f['id']}/thumb",
                 )
@@ -231,8 +234,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
         data = await asyncio.to_thread(build)
         media = "image/gif" if format == "gif" else "video/mp4"
-        return Response(data, media_type=media,
-                        headers={"Content-Disposition": f'attachment; filename="flipster-{rid}.{format}"'})
+        return Response(
+            data, media_type=media, headers={"Content-Disposition": f'attachment; filename="flipster-{rid}.{format}"'}
+        )
 
     # ------------------------------------------------------------ frontend
 

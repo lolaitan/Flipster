@@ -28,7 +28,7 @@ def test_v1_flow_is_eight_times_too_small():
 
 
 def test_v1_warp_direction_is_backwards():
-    a, b = blob(34), blob(40)  # moves +6 px, midpoint at 37
+    a = blob(34)  # moves +6 px (to 40), so the midpoint is at 37
     flow = np.zeros(a.shape + (2,), np.float32)
     flow[..., 0] = 6.0  # the *correct* flow, so only the warp is under test
     h, w = a.shape
