@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.venv/
+venv/
+dist/
+build/
+_skbuild/
+python/flipster/_core*.so
+python/flipster/_core*.pyd
+
+# C++ / CMake
+/build*/
+/out/
+CMakeUserPresets.json
+compile_commands.json
+
+# Node
+node_modules/
+web/dist/
+web/coverage/
+*.tsbuildinfo
+
+# Runtime data
+data/
+bench/results/*.local.*
+eval/data/
+
+# Editors / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
