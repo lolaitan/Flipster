@@ -5,6 +5,8 @@
 #include <chrono>
 #include <cstdio>
 #include <cstring>
+#include <exception>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -32,7 +34,13 @@ int main(int argc, char** argv) {
   }
   testing::WaveTexture tex(11);
   const Plane a = tex.render(w, h), b = tex.render(w, h, 12.5f, -7.25f);
-  auto engine = make_engine(backend, variant);
+  std::unique_ptr<Engine> engine;
+  try {
+    engine = make_engine(backend, variant);
+  } catch (const std::exception& e) {
+    std::fprintf(stderr, "flipster_bench: %s\n", e.what());
+    return 2;
+  }
   engine->flow(a, b, FlowParams());  // warm-up (allocations, CUDA context)
 
   std::vector<double> wall, compute;

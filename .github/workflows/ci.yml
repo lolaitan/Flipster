@@ -51,8 +51,8 @@ jobs:
         run: pip install ".[server,dev]"
       - name: Lint
         run: |
-          ruff check python server tests bench eval docs
-          ruff format --check python server tests bench eval docs
+          ruff check python server tests bench eval docs notebooks
+          ruff format --check python server tests bench eval docs notebooks
       - name: Test (NumPy reference + C++ engine + API)
         run: pytest
 

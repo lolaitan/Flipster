@@ -120,6 +120,15 @@ splatting.
 
 ## Running it
 
+### Google Colab (free NVIDIA GPU)
+
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/lolaitan/Flipster/blob/main/notebooks/flipster_colab.ipynb)
+
+[`notebooks/flipster_colab.ipynb`](notebooks/flipster_colab.ipynb) builds the CUDA engine on Colab's GPU, runs the C++
+and Python suites (including CPU↔CUDA parity), benchmarks every backend up to 4K, runs the Middlebury evaluation,
+renders the sample flipbook and can serve the web app through Colab's proxy. Pick *Runtime → Change runtime type → T4
+GPU*, then *Run all*. The last cell downloads the results.
+
 ### Windows (one click)
 
 Double-click **`scripts\windows\setup.cmd`**. It finds Python, creates `.venv`, builds the C++ engine with Visual
