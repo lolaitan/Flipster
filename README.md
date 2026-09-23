@@ -116,7 +116,7 @@ JSON). For per-kernel profiles, run `nsys profile build/flipster_bench --backend
 **Accuracy:** run `python eval/middlebury.py --download --out eval/results.md`. It reports end-point / angular error
 against Middlebury ground-truth flow, and PSNR / SSIM of the synthesized midpoint against Middlebury's ground-truth
 interpolated frames. Methods compared: cross-dissolve, v1's backward warp (with its bugs fixed) and Flipster's
-splatting.
+splatting. If vision.middlebury.edu is unreachable, download the zips in a browser and pass `--data <folder>`.
 
 ## Running it
 

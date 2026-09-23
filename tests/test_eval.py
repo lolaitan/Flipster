@@ -65,3 +65,84 @@ def test_harness_on_synthetic_data(tmp_path):
     assert np.mean(by["Flipster splat"]) > np.mean(by["Cross-dissolve"]) + 3
     md = mb.report(flow, interp)
     assert "Flow accuracy" in md and "Alpha" in md
+
+
+def test_finds_frames_in_any_archive_layout(tmp_path):
+    make_dataset(tmp_path)
+    # other-color-twoframes.zip unpacks into a differently named folder
+    (tmp_path / "other-data").rename(tmp_path / "other-color-twoframes")
+    rows = mb.evaluate_flow(tmp_path, "numpy", mb.FlowParams())
+    assert {r.seq for r in rows} == {"Alpha", "Beta"}
+
+
+class _Resp:
+    def __init__(self, data):
+        self.data = data
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+    def read(self):
+        return self.data
+
+
+def _zip_bytes():
+    import io
+    import zipfile
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr("x/readme.txt", "hi")
+    return buf.getvalue()
+
+
+def test_fetch_falls_back_to_http(monkeypatch):
+    calls = []
+
+    def fake_urlopen(req, timeout):
+        calls.append(req.full_url)
+        if req.full_url.startswith("https://"):
+            raise TimeoutError("timed out")
+        return _Resp(b"ok")
+
+    monkeypatch.setattr(mb.urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(mb.time, "sleep", lambda s: None)
+    assert mb.fetch("other-gt-flow.zip") == b"ok"
+    assert calls[0].startswith("https://") and calls[1].startswith("http://")
+
+
+def test_download_gives_up_cleanly_and_skips_optional(monkeypatch, tmp_path):
+    def unreachable(req, timeout):
+        raise TimeoutError("timed out")
+
+    monkeypatch.setattr(mb.urllib.request, "urlopen", unreachable)
+    monkeypatch.setattr(mb.time, "sleep", lambda s: None)
+    import pytest
+
+    with pytest.raises(mb.DownloadError):
+        mb.download(tmp_path)
+
+    def only_required(req, timeout):
+        if "interp" in req.full_url:
+            raise mb.urllib.error.HTTPError(req.full_url, 404, "nf", {}, None)
+        return _Resp(_zip_bytes())
+
+    monkeypatch.setattr(mb.urllib.request, "urlopen", only_required)
+    mb.download(tmp_path)  # optional archive missing: no exception
+    assert (tmp_path / ".other-gt-flow.zip.done").exists()
+    assert not (tmp_path / ".other-gt-interp.zip.done").exists()
+
+
+def test_main_exits_with_instructions_when_offline(monkeypatch, tmp_path, capsys):
+    monkeypatch.setattr(mb.urllib.request, "urlopen", lambda req, timeout: (_ for _ in ()).throw(TimeoutError("x")))
+    monkeypatch.setattr(mb.time, "sleep", lambda s: None)
+    monkeypatch.setattr(mb.sys, "argv", ["middlebury.py", "--download", "--data", str(tmp_path)])
+    import pytest
+
+    with pytest.raises(SystemExit) as e:
+        mb.main()
+    assert e.value.code == 2
+    assert "--data" in capsys.readouterr().err

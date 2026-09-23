@@ -8,8 +8,13 @@ Two questions, answered on the public training sequences:
 2. Are the in-betweens right?  PSNR / SSIM of the synthesized midpoint against
    the ground-truth frame10i11 that Middlebury provides for interpolation.
 
-    python eval/middlebury.py --download          # ~30 MB into eval/data
+    python eval/middlebury.py --download          # a few MB into eval/data
     python eval/middlebury.py --backend cuda --out eval/results.md
+
+If the download is blocked (some networks cannot reach vision.middlebury.edu),
+download other-color-twoframes.zip, other-gt-flow.zip and other-gt-interp.zip
+from https://vision.middlebury.edu/flow/data/ in a browser, unzip them anywhere
+under one folder, and pass it with --data.
 
 Natural video is not what Flipster is tuned for (it expects line art), so this
 is a sanity check of the core algorithm against well-known references, not a
@@ -21,6 +26,8 @@ from __future__ import annotations
 import argparse
 import io
 import sys
+import time
+import urllib.error
 import urllib.request
 import zipfile
 from dataclasses import dataclass
@@ -38,8 +45,12 @@ except ImportError:
 from flipster import FlowParams, SplatParams, get_engine  # noqa: E402
 from flipster.reference import warp_backward  # noqa: E402
 
-BASE = "https://vision.middlebury.edu/flow/data/comp/zip/"
-ARCHIVES = ("other-data.zip", "other-gt-flow.zip", "other-gt-interp.zip")
+MIRRORS = (
+    "https://vision.middlebury.edu/flow/data/comp/zip/",
+    "http://vision.middlebury.edu/flow/data/comp/zip/",
+)
+# name -> required? (the interpolation ground truth is only needed for part 2)
+ARCHIVES = {"other-color-twoframes.zip": True, "other-gt-flow.zip": True, "other-gt-interp.zip": False}
 TAG_FLOAT = 202021.25
 UNKNOWN = 1e9
 
@@ -47,12 +58,50 @@ UNKNOWN = 1e9
 # --------------------------------------------------------------------------- io
 
 
+class DownloadError(RuntimeError):
+    pass
+
+
+def fetch(name: str, attempts: int = 3, timeout: float = 30.0) -> bytes:
+    """Download one archive, trying https then http, with retries and backoff."""
+    last: Exception | None = None
+    for attempt in range(attempts):
+        for base in MIRRORS:
+            req = urllib.request.Request(base + name, headers={"User-Agent": "Mozilla/5.0 (flipster-eval)"})
+            try:
+                with urllib.request.urlopen(req, timeout=timeout) as r:
+                    return r.read()
+            except urllib.error.HTTPError as e:
+                if e.code == 404:
+                    raise DownloadError(f"{base + name}: not found (404)") from e
+                last = e
+            except (urllib.error.URLError, TimeoutError, OSError) as e:
+                last = e
+            print(f"  {base + name}: {last}", flush=True)
+        if attempt + 1 < attempts:
+            time.sleep(5 * (attempt + 1))
+    raise DownloadError(f"could not download {name}: {last}")
+
+
 def download(dest: Path) -> None:
     dest.mkdir(parents=True, exist_ok=True)
-    for name in ARCHIVES:
+    for name, required in ARCHIVES.items():
+        marker = dest / f".{name}.done"
+        if marker.exists():
+            continue
         print(f"downloading {name} ...", flush=True)
-        with urllib.request.urlopen(BASE + name, timeout=120) as r:
-            zipfile.ZipFile(io.BytesIO(r.read())).extractall(dest)
+        try:
+            zipfile.ZipFile(io.BytesIO(fetch(name))).extractall(dest)
+            marker.touch()
+        except DownloadError as e:
+            if required:
+                raise
+            print(f"  skipping optional {name}: {e}", flush=True)
+
+
+def find(root: Path, seq: str, filename: str) -> Path | None:
+    """Locate a sequence file wherever the archives were unzipped."""
+    return next(iter(sorted(root.glob(f"**/{seq}/{filename}"))), None)
 
 
 def read_flo(path: Path) -> np.ndarray:
@@ -148,12 +197,12 @@ def evaluate_flow(root: Path, backend: str, params: FlowParams) -> list[FlowRow]
     rows: list[FlowRow] = []
     eng = get_engine(backend)
     methods = {f"Flipster LK ({eng.name})": lambda a, b: eng.flow(a, b, params), **reference_flows()}
-    for gt_path in sorted((root / "other-gt-flow").glob("*/flow10.flo")):
+    for gt_path in sorted(root.glob("**/flow10.flo")):
         seq = gt_path.parent.name
-        d = root / "other-data" / seq
-        if not (d / "frame10.png").exists():
+        f0, f1 = find(root, seq, "frame10.png"), find(root, seq, "frame11.png")
+        if not (f0 and f1):
             continue
-        a, b, gt = gray(d / "frame10.png"), gray(d / "frame11.png"), read_flo(gt_path)
+        a, b, gt = gray(f0), gray(f1), read_flo(gt_path)
         for name, fn in methods.items():
             aee, aae = flow_errors(fn(a, b), gt)
             rows.append(FlowRow(seq, name, aee, aae))
@@ -163,12 +212,12 @@ def evaluate_flow(root: Path, backend: str, params: FlowParams) -> list[FlowRow]
 def evaluate_interp(root: Path, backend: str, params: FlowParams) -> list[InterpRow]:
     rows: list[InterpRow] = []
     eng = get_engine(backend)
-    for gt_path in sorted((root / "other-gt-interp").glob("*/frame10i11.png")):
+    for gt_path in sorted(root.glob("**/frame10i11.png")):
         seq = gt_path.parent.name
-        d = root / "other-data" / seq
-        if not (d / "frame10.png").exists():
+        f0, f1 = find(root, seq, "frame10.png"), find(root, seq, "frame11.png")
+        if not (f0 and f1):
             continue
-        i0, i1, gt = rgb(d / "frame10.png"), rgb(d / "frame11.png"), rgb(gt_path)
+        i0, i1, gt = rgb(f0), rgb(f1), rgb(gt_path)
         g0, g1 = cv2.cvtColor(i0, cv2.COLOR_RGB2GRAY), cv2.cvtColor(i1, cv2.COLOR_RGB2GRAY)
         f01, f10 = eng.flow(g0, g1, params), eng.flow(g1, g0, params)
         preds = {
@@ -205,8 +254,12 @@ def _table(rows, key_a: str, key_b: str, fmt: str, label_a: str, label_b: str) -
 def report(flow_rows: list[FlowRow], interp_rows: list[InterpRow]) -> str:
     lines = ["### Flow accuracy (frame10 → frame11)", "", "Average end-point error in pixels (lower is better).", ""]
     lines += _table(flow_rows, "aee", "aae", ".3f", "AEE", "AAE°")
-    lines += ["", "### Midpoint interpolation (frame10i11)", "", "PSNR in dB (higher is better).", ""]
-    lines += _table(interp_rows, "psnr", "ssim", ".2f", "PSNR", "SSIM")
+    lines += ["", "### Midpoint interpolation (frame10i11)", ""]
+    if interp_rows:
+        lines += ["PSNR in dB (higher is better).", ""]
+        lines += _table(interp_rows, "psnr", "ssim", ".2f", "PSNR", "SSIM")
+    else:
+        lines += ["Skipped: no ground-truth interpolated frames (other-gt-interp.zip) found."]
     return "\n".join(lines) + "\n"
 
 
@@ -218,9 +271,20 @@ def main() -> None:
     ap.add_argument("--out", type=Path, default=None)
     args = ap.parse_args()
     if args.download:
-        download(args.data)
-    if not (args.data / "other-data").exists():
-        sys.exit(f"no data in {args.data}; run with --download first")
+        try:
+            download(args.data)
+        except DownloadError as e:
+            print(f"\nDownload failed: {e}", file=sys.stderr)
+            print(
+                "vision.middlebury.edu may be down or unreachable from this network. Download "
+                + ", ".join(ARCHIVES)
+                + " from https://vision.middlebury.edu/flow/data/ in a browser, unzip them into one folder "
+                "and rerun with --data <folder>.",
+                file=sys.stderr,
+            )
+            sys.exit(2)
+    if not any(args.data.glob("**/flow10.flo")):
+        sys.exit(f"no Middlebury data in {args.data}; run with --download, or pass --data <folder>")
     params = FlowParams(damping=0.05, median=True)
     md = report(evaluate_flow(args.data, args.backend, params), evaluate_interp(args.data, args.backend, params))
     print(md)
