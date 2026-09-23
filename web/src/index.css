@@ -1,0 +1,69 @@
+@import '@fontsource-variable/inter';
+@import '@fontsource/caveat/600.css';
+@import 'tailwindcss';
+
+/* Notebook palette: warm paper, graphite ink, ruled-line blue, margin red. */
+@theme {
+  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-hand: 'Caveat', 'Comic Sans MS', cursive;
+  --font-mono: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+
+  --color-paper: #faf7f0;
+  --color-paper-2: #f3efe5;
+  --color-desk: #ebe5d8;
+  --color-line: #ddd5c4;
+  --color-ink: #1d1f24;
+  --color-ink-2: #4a4f5a;
+  --color-ink-3: #7c8190;
+  --color-rule: #9db8e8;
+  --color-rule-soft: #d6e2f6;
+  --color-margin: #e0707a;
+  --color-accent: #2f5bd3;
+  --color-accent-dark: #2448ab;
+  --color-good: #2f8f5b;
+  --color-bad: #c2414b;
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    @apply bg-desk font-sans text-ink antialiased;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+}
+
+@utility ruled {
+  /* Lined-notebook background used behind empty states and the draw pad. */
+  background-color: var(--color-paper);
+  background-image:
+    linear-gradient(to right, transparent 46px, var(--color-margin) 46px, var(--color-margin) 47.5px, transparent 47.5px),
+    repeating-linear-gradient(to bottom, transparent 0 31px, var(--color-rule-soft) 31px 32px);
+}
+
+@utility checker {
+  background-color: #fff;
+  background-image:
+    linear-gradient(45deg, #f1ede4 25%, transparent 25%),
+    linear-gradient(-45deg, #f1ede4 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #f1ede4 75%),
+    linear-gradient(-45deg, transparent 75%, #f1ede4 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+}
+
+@keyframes flip {
+  0%,
+  100% {
+    transform: rotate(-2deg);
+  }
+  50% {
+    transform: rotate(2deg);
+  }
+}
