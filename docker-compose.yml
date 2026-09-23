@@ -1,0 +1,20 @@
+# docker compose up                 -> CPU build on http://localhost:8000
+# docker compose --profile gpu up   -> CUDA build (NVIDIA Container Toolkit required)
+services:
+  flipster:
+    build: { context: ., dockerfile: docker/Dockerfile }
+    ports: ["8000:8000"]
+    volumes: ["flipster-data:/data"]
+
+  flipster-gpu:
+    profiles: [gpu]
+    build: { context: ., dockerfile: docker/Dockerfile.cuda }
+    ports: ["8001:8000"]
+    volumes: ["flipster-data:/data"]
+    deploy:
+      resources:
+        reservations:
+          devices: [{ driver: nvidia, count: 1, capabilities: [gpu] }]
+
+volumes:
+  flipster-data:

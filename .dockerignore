@@ -1,0 +1,9 @@
+.git
+**/node_modules
+**/__pycache__
+build
+data
+web/dist
+eval/data
+bench/results/*.local.*
+*.pyc
