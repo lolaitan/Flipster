@@ -161,7 +161,7 @@ so treat this as a sanity check of the core algorithm.
 
 ## Running it
 
-### Google Colab (free NVIDIA GPU)
+### Google Colab
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/lolaitan/Flipster/blob/main/notebooks/flipster_colab.ipynb)
 
